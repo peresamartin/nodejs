@@ -1,5 +1,11 @@
+/* eslint-disable node/no-unsupported-features/es-syntax */
 /* eslint-disable no-console */
-const { CastError, ValidationError } = require('mongoose');
+const {
+  CastError,
+  ValidationError,
+  JsonWebTokenError,
+  TokenExpiredError,
+} = require('mongoose');
 const AppError = require('../utilities/appError');
 
 const handleCastErrorDB = (err) => {
@@ -13,13 +19,16 @@ const handleDuplicateErrorDB = (err) => {
 };
 
 const handleValidationErrorDB = (err) => {
-  const errors = Object.values(err.errors).map((el) => el.message);
-  const message = `Invalid input data. ${errors.join('. ')}`;
-  return new AppError(message, 400);
+  if (err.errors !== undefined) {
+    const errors = Object.values(err.errors).map((el) => el.message);
+    const message = `Invalid input data. ${errors.join('. ')}`;
+    return new AppError(message, 400);
+  }
 };
 
 const handleJWTError = () => {
   const message = `Please login again.`;
+
   return new AppError(message, 401);
 };
 
@@ -60,7 +69,7 @@ module.exports = (err, req, res, next) => {
     sendErrorDev(err, res);
   } else if (process.env.NODE_ENV === 'production') {
     let error = { ...err };
-    if (err instanceof CastError) {
+    if (error instanceof CastError) {
       error = handleCastErrorDB(error);
     }
     if (error.code === 11000) {
@@ -69,10 +78,7 @@ module.exports = (err, req, res, next) => {
     if (error.name === ValidationError) {
       error = handleValidationErrorDB(error);
     }
-    if (
-      error.name === 'JsonWebTokenError' ||
-      error.name === 'TokenExpiredError'
-    ) {
+    if (error.name === JsonWebTokenError || error.name === TokenExpiredError) {
       error = handleJWTError();
     }
     sendErrorProd(error, res);
